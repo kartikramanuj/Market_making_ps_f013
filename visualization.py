@@ -3,7 +3,7 @@
 import matplotlib.pyplot as plt
 from pnl_tracker import PnLTracker
 
-# Simulated trade data (use same from simulation.py or load from file)
+# Simulated trade data (sample)
 trades = [
     {"price": 100, "quantity": 2, "side": "buy"},
     {"price": 103, "quantity": 1, "side": "sell"},
@@ -11,10 +11,10 @@ trades = [
     {"price": 99, "quantity": 1, "side": "buy"}
 ]
 
-# Spread over time (provided by teammate)
+# Spread over time (sample)
 spread_series = [2.0, 1.8, 1.5, 1.6]
 
-# Inventory over time (for optional plotting)
+# Inventory over time
 inventory_series = []
 tracker = PnLTracker()
 
