@@ -1,7 +1,7 @@
 # test_pnl.py
 
 from pnl_tracker import PnLTracker
-from .OrderBook import OrderBook
+from OrderBook import OrderBook
 
 def test_simple_buy_sell():
     tracker = PnLTracker()
