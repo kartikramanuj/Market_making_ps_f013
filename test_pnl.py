@@ -26,11 +26,9 @@ def test_multiple_trades():
 def test_quote_from_orderbook():
     ob = OrderBook()
 
-    # Add buy orders
+    # Add buy/sell orders
     ob.process_order({'price': 99, 'quantity': 1, 'side': 'buy'})
     ob.process_order({'price': 98, 'quantity': 2, 'side': 'buy'})
-
-    # Add sell orders
     ob.process_order({'price': 101, 'quantity': 1, 'side': 'sell'})
     ob.process_order({'price': 102, 'quantity': 1, 'side': 'sell'})
 
