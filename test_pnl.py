@@ -1,6 +1,7 @@
 # test_pnl.py
 
 from pnl_tracker import PnLTracker
+from OrderBook import OrderBook
 
 def test_simple_buy_sell():
     tracker = PnLTracker()
@@ -22,6 +23,27 @@ def test_multiple_trades():
     assert summary["Inventory"] == 0
     print("test_multiple_trades passed")
 
+def test_quote_from_orderbook():
+    ob = OrderBook()
+
+    # Add buy orders
+    ob.process_order({'price': 99, 'quantity': 1, 'side': 'buy'})
+    ob.process_order({'price': 98, 'quantity': 2, 'side': 'buy'})
+
+    # Add sell orders
+    ob.process_order({'price': 101, 'quantity': 1, 'side': 'sell'})
+    ob.process_order({'price': 102, 'quantity': 1, 'side': 'sell'})
+
+    # Get best bid/ask
+    best_bid = ob.get_best_bid()
+    best_ask = ob.get_best_ask()
+
+    assert best_bid == 99
+    assert best_ask == 101
+
+    print("test_quote_from_orderbook passed")
+
 if __name__ == "__main__":
     test_simple_buy_sell()
     test_multiple_trades()
+    test_quote_from_orderbook()
