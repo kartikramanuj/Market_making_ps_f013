@@ -29,6 +29,7 @@ class Simulator:
         self.thread = None
         self.callbacks = []
         self.order_counter = 0
+        self.order_id_counter = 0
 
     def add_callback(self, fn):
         self.callbacks.append(fn)
@@ -56,6 +57,7 @@ class Simulator:
                 'type': 'limit',
                 'side': 'bid',
                 'quantity': qty,
+                'order_id': self.order_id_counter,
                 'price': bid_price
             }
             
@@ -75,6 +77,7 @@ class Simulator:
                 'type': 'limit',
                 'side': 'ask',
                 'quantity': qty,
+                'order_id': self.order_id_counter,
                 'price': ask_price
             }
             
@@ -90,8 +93,9 @@ class Simulator:
         is_mkt = random.random() < self.cfg.market_ratio
         side = 'bid' if random.random() < (0.5 + self.cfg.trend * 0.3) else 'ask'
         qty = round(random.uniform(self.cfg.min_size, self.cfg.max_size), 4)
-        
+        self.order_id_counter += 1
         order = {
+            'order_id': f"random_{side}_{self.order_id_counter}",
             'type': 'market' if is_mkt else 'limit',
             'side': side,
             'quantity': qty
