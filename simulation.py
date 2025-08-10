@@ -235,7 +235,7 @@ def main():
     p = argparse.ArgumentParser(description="Market Simulation")
     p.add_argument('--duration', type=int, default=60)
     p.add_argument('--order-rate', type=float, default=2.0)
-    p.add_argument('--base-price', type=float, default=100.0)
+    p.add_argument('--base-price', type=float, default=118190.0)
     p.add_argument('--volatility', type=float, default=0.02)
     p.add_argument('--spread', type=float, default=0.01)
     p.add_argument('--market-ratio', type=float, default=0.3)
@@ -287,4 +287,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
