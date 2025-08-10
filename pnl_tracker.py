@@ -1,12 +1,11 @@
 from typing import Dict, List, Tuple, Optional
 import time
 
-
 class PnLTracker:
     """
     This class tracks my profit and loss from trading.
     It uses FIFO (First In, First Out) accounting to calculate realized P&L.
-    I think this is pretty cool - it automatically handles long and short positions!
+    It automatically handles long and short positions!
     """
     
     def __init__(self):
@@ -25,7 +24,11 @@ class PnLTracker:
         Record a trade and update P&L calculations
         This is where the magic happens!
         """
-        print(f"Recording trade: {side.upper()} {quantity} shares @ ${price:.2f}")
+        # Ensure price and quantity are floats for PnLTracker's internal calculations
+        price = float(price)
+        quantity = float(quantity)
+
+        print(f"Recording trade: {side.upper()} {quantity:.2f} shares @ ${price:.2f}")
         self.total_trades += 1
         
         if side.lower() == 'buy':
@@ -35,7 +38,7 @@ class PnLTracker:
             
             # First, check if I'm covering any short positions
             remaining_quantity = quantity
-            while remaining_quantity > 0 and self.short_positions:
+            while remaining_quantity > 0.00001 and self.short_positions: # Use a small epsilon for float comparison
                 short_price, short_qty = self.short_positions[0]  # Get oldest short position
                 matched_qty = min(remaining_quantity, short_qty)
                 
@@ -43,11 +46,11 @@ class PnLTracker:
                 pnl_from_this_match = (short_price - price) * matched_qty
                 self.realized_pnl += pnl_from_this_match
                 
-                print(f"   -> Covering short position: {matched_qty} @ ${short_price:.2f} with buy @ ${price:.2f}")
+                print(f"   -> Covering short position: {matched_qty:.2f} @ ${short_price:.2f} with buy @ ${price:.2f}")
                 print(f"   -> P&L from this: ${pnl_from_this_match:.2f}")
                 
                 # Update or remove the short position
-                if matched_qty == short_qty:
+                if abs(matched_qty - short_qty) < 0.00001: # Use epsilon for float comparison
                     self.short_positions.pop(0)  # Remove this short position completely
                 else:
                     self.short_positions[0] = (short_price, short_qty - matched_qty)
@@ -55,12 +58,12 @@ class PnLTracker:
                 remaining_quantity -= matched_qty
             
             # If there's still quantity left, add it as a new long position
-            if remaining_quantity > 0:
+            if remaining_quantity > 0.00001: # Use epsilon
                 self.long_positions.append((price, remaining_quantity))
-                print(f"   -> Added new long position: {remaining_quantity} @ ${price:.2f}")
+                print(f"   -> Added new long position: {remaining_quantity:.2f} @ ${price:.2f}")
             
             print(f"   -> Cash outflow: ${price * quantity:.2f} (total cash flow: ${self.cash_flow:.2f})")
-            print(f"   -> Inventory change: +{quantity} = {self.inventory}")
+            print(f"   -> Inventory change: +{quantity:.2f} = {self.inventory:.2f}")
             
         elif side.lower() == 'sell':
             # I'm selling shares
@@ -69,7 +72,7 @@ class PnLTracker:
             
             # First, check if I'm closing any long positions
             remaining_quantity = quantity
-            while remaining_quantity > 0 and self.long_positions:
+            while remaining_quantity > 0.00001 and self.long_positions: # Use epsilon
                 long_price, long_qty = self.long_positions[0]  # Get oldest long position
                 matched_qty = min(remaining_quantity, long_qty)
                 
@@ -77,11 +80,11 @@ class PnLTracker:
                 pnl_from_this_match = (price - long_price) * matched_qty
                 self.realized_pnl += pnl_from_this_match
                 
-                print(f"   -> Closing long position: {matched_qty} @ ${long_price:.2f} with sell @ ${price:.2f}")
+                print(f"   -> Closing long position: {matched_qty:.2f} @ ${long_price:.2f} with sell @ ${price:.2f}")
                 print(f"   -> P&L from this: ${pnl_from_this_match:.2f}")
                 
                 # Update or remove the long position
-                if matched_qty == long_qty:
+                if abs(matched_qty - long_qty) < 0.00001: # Use epsilon
                     self.long_positions.pop(0)  # Remove this long position completely
                 else:
                     self.long_positions[0] = (long_price, long_qty - matched_qty)
@@ -89,12 +92,12 @@ class PnLTracker:
                 remaining_quantity -= matched_qty
             
             # If there's still quantity left, add it as a new short position
-            if remaining_quantity > 0:
+            if remaining_quantity > 0.00001: # Use epsilon
                 self.short_positions.append((price, remaining_quantity))
-                print(f"   -> Added new short position: {remaining_quantity} @ ${price:.2f}")
+                print(f"   -> Added new short position: {remaining_quantity:.2f} @ ${price:.2f}")
             
             print(f"   -> Cash inflow: ${price * quantity:.2f} (total cash flow: ${self.cash_flow:.2f})")
-            print(f"   -> Inventory change: -{quantity} = {self.inventory}")
+            print(f"   -> Inventory change: -{quantity:.2f} = {self.inventory:.2f}")
         
         # Print current state for debugging
         print(f"   -> Current long positions: {self.long_positions}")
@@ -138,3 +141,4 @@ class PnLTracker:
         Get total P&L (realized + unrealized)
         """
         return self.realized_pnl + self.get_unrealized_pnl(current_price)
+
