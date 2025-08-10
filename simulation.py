@@ -5,15 +5,16 @@ import argparse
 import json
 from dataclasses import dataclass
 from OrderBook import OrderBook
+from decimal import Decimal
 
 @dataclass
 class Config:
     duration: int = 60
     order_rate: float = 2.0
-    base_price: float = 100.0
+    base_price: float = 118190.0
     volatility: float = 0.02
-    spread: float = 0.01
-    market_ratio: float = 0.3
+    spread: float = 0.005
+    market_ratio: float = 0.8
     trend: float = 0.0
     depth: int = 5
     min_size: float = 1.0
@@ -23,8 +24,8 @@ class Simulator:
     def __init__(self, config: Config):
         self.cfg = config
         self.book = OrderBook()
-        self.price = config.base_price
-        self.history = [self.price]
+        self.price = Decimal(str(config.base_price))
+        self.history = [float(self.price)]
         self.running = False
         self.thread = None
         self.callbacks = []
@@ -38,22 +39,22 @@ class Simulator:
         for fn in self.callbacks:
             try: 
                 fn(event, data)
-            except: 
-                pass
+            except Exception as e: 
+                print(f"Error in callback for event {event}: {e}")
 
     def _market_maker(self):
         """Place market maker orders around current price"""
-        half_spread = self.cfg.spread * self.price / 2
+        half_spread = Decimal(str(self.cfg.spread)) * self.price / 2
         
         for i in range(self.cfg.depth):
-            offset = half_spread * (1 + i * 0.5)
+            offset = half_spread * Decimal(str(1 + i * 0.5))
             qty = round(random.uniform(self.cfg.min_size, self.cfg.max_size), 4)
             
             # Place bid order
-            bid_price = round(self.price - offset, 4)
+            bid_price = (self.price - offset).quantize(Decimal('0.0001'))
             self.order_counter += 1
             bid_order = {
-                'order_id': f"mm_bid_{i}_{self.order_counter}",
+                'order_id': f"mm_bid_{self.order_counter}",
                 'type': 'limit',
                 'side': 'bid',
                 'quantity': qty,
@@ -63,17 +64,15 @@ class Simulator:
             
             try:
                 trades, _ = self.book.process_order(bid_order, verbose=False)
-                if trades:
-                    self._process_trades(trades)
-                    self._notify("trade", {"trades": trades})
+                # Removed trade notification here
             except Exception as e:
                 print(f"Market maker bid order failed: {e}")
             
             # Place ask order
-            ask_price = round(self.price + offset, 4)
+            ask_price = (self.price + offset).quantize(Decimal('0.0001'))
             self.order_counter += 1
             ask_order = {
-                'order_id': f"mm_ask_{i}_{self.order_counter}",
+                'order_id': f"mm_ask_{self.order_counter}",
                 'type': 'limit',
                 'side': 'ask',
                 'quantity': qty,
@@ -83,11 +82,10 @@ class Simulator:
             
             try:
                 trades, _ = self.book.process_order(ask_order, verbose=False)
-                if trades:
-                    self._process_trades(trades)
-                    self._notify("trade", {"trades": trades})
+                # Removed trade notification here
             except Exception as e:
                 print(f"Market maker ask order failed: {e}")
+
     def _random_order(self):
         """Generate random market participant order"""
         is_mkt = random.random() < self.cfg.market_ratio
@@ -102,45 +100,39 @@ class Simulator:
         }
 
         if not is_mkt:
-            shift = random.uniform(0, self.cfg.volatility * self.price)
+            shift = Decimal(str(random.uniform(0, self.cfg.volatility * float(self.price))))
             price = self.price - shift if side == 'bid' else self.price + shift
-            order['price'] = round(max(0.01, price), 4)
+            order['price'] = price.quantize(Decimal('0.0001'))
 
         return order
 
     def _update_price(self):
-        """Update price based on recent trades"""
+        """Update price based on recent trades and add random walk"""
         if hasattr(self.book, 'tape') and self.book.tape:
             recent = list(self.book.tape)[-10:]
             if recent:
-                vol = sum(float(t.get('quantity', 0)) for t in recent)
-                if vol > 0:
-                    vwap = sum(float(t.get('price', 0)) * float(t.get('quantity', 0)) for t in recent) / vol
-                    self.price = 0.9 * self.price + 0.1 * vwap
+                vol = sum(t.get('quantity', Decimal('0')) for t in recent)
+                if vol > Decimal('0'):
+                    vwap = sum(t.get('price', Decimal('0')) * t.get('quantity', Decimal('0')) for t in recent) / vol
+                    self.price = (Decimal('0.9') * self.price + Decimal('0.1') * vwap).quantize(Decimal('0.0001'))
         
-        # Add random walk
-        self.price += random.gauss(0, self.cfg.volatility * self.price * 0.1)
-        self.price = max(0.01, self.price)
-        self.history.append(self.price)
+        random_walk_amount = Decimal(str(random.gauss(0, self.cfg.volatility * float(self.price) * 0.1)))
+        self.price = (self.price + random_walk_amount).quantize(Decimal('0.0001'))
+        self.price = max(Decimal('0.01'), self.price)
+        self.history.append(float(self.price))
         
         if len(self.history) > 1000:
             self.history = self.history[-1000:]
 
     def _get_best_bid(self):
         """Safely get best bid price"""
-        try:
-            bid = self.book.get_best_bid()
-            return float(bid) if bid is not None else None
-        except:
-            return None
+        bid = self.book.get_best_bid()
+        return float(bid) if bid is not None else None
 
     def _get_best_ask(self):
         """Safely get best ask price"""
-        try:
-            ask = self.book.get_best_ask()
-            return float(ask) if ask is not None else None
-        except:
-            return None
+        ask = self.book.get_best_ask()
+        return float(ask) if ask is not None else None
 
     def _loop(self):
         """Main simulation loop"""
@@ -162,7 +154,7 @@ class Simulator:
                     trades, _ = self.book.process_order(order, verbose=False)
                     if trades: 
                         self._notify("trade", {"trades": trades})
-                    self._update_price()
+                        self._update_price() 
                     self._notify("order", {"order": order})
                 except Exception as e:
                     pass  # Silently handle order failures
@@ -172,17 +164,17 @@ class Simulator:
             # Refresh market maker orders
             if now >= next_mm:
                 try:
-                    # Count total orders in book
-                    total_orders = len(self.book.bids) + len(self.book.asks)
-                    if total_orders < 20:
+                    total_orders_in_book = self.book.bids.num_orders + self.book.asks.num_orders
+                    if total_orders_in_book < (self.cfg.depth * 2 * 2):
                         self._market_maker()
-                except:
+                except Exception as e:
+                    print(f"Error during market maker refresh: {e}")
                     self._market_maker()
                 next_mm = now + 5
             
             # Send market data update
             self._notify("market_data", {
-                "price": self.price,
+                "price": float(self.price),
                 "best_bid": self._get_best_bid(),
                 "best_ask": self._get_best_ask(),
                 "timestamp": now
@@ -201,7 +193,6 @@ class Simulator:
         self.thread.start()
 
     def stop(self):
-        
         self.running = False
         if self.thread: 
             self.thread.join()
@@ -212,15 +203,15 @@ class Simulator:
                   for i in range(1, len(self.history))]
         
         total_trades = len(self.book.tape) if hasattr(self.book, 'tape') else 0
-        total_volume = sum(float(t.get('quantity', 0)) for t in self.book.tape) if hasattr(self.book, 'tape') else 0.0
+        total_volume = sum(float(t.get('quantity', Decimal('0'))) for t in self.book.tape) if hasattr(self.book, 'tape') else 0.0
         
         return {
             "price": {
                 "start": self.cfg.base_price,
-                "end": self.price,
-                "change": (self.price - self.cfg.base_price) / self.cfg.base_price,
-                "min": min(self.history),
-                "max": max(self.history),
+                "end": float(self.price),
+                "change": (float(self.price) - self.cfg.base_price) / self.cfg.base_price,
+                "min": min(self.history) if self.history else self.cfg.base_price,
+                "max": max(self.history) if self.history else self.cfg.base_price,
                 "realized_vol": sum(abs(c) for c in changes) / len(changes) if changes else 0
             },
             "trades": {
@@ -236,7 +227,7 @@ def main():
     p.add_argument('--duration', type=int, default=60)
     p.add_argument('--order-rate', type=float, default=2.0)
     p.add_argument('--base-price', type=float, default=118190.0)
-    p.add_argument('--volatility', type=float, default=0.02)
+    p.add_argument('--volatility', type=float, default=0.05)
     p.add_argument('--spread', type=float, default=0.01)
     p.add_argument('--market-ratio', type=float, default=0.3)
     p.add_argument('--trend', type=float, default=0.0)
@@ -260,11 +251,11 @@ def main():
         def cb(evt, data):
             if evt == 'trade':
                 for t in data['trades']:
-                    print(f"TRADE: {t.get('quantity', 0):.2f} @ ${t.get('price', 0):.2f}")
+                    print(f"TRADE: {float(t.get('quantity', 0)):.2f} @ ${float(t.get('price', 0)):.2f}")
             elif evt == 'market_data':
                 md = data
-                bid = f"${md['best_bid']:.2f}" if md['best_bid'] else "N/A"
-                ask = f"${md['best_ask']:.2f}" if md['best_ask'] else "N/A"
+                bid = f"${md['best_bid']:.2f}" if md['best_bid'] is not None else "N/A"
+                ask = f"${md['best_ask']:.2f}" if md['best_ask'] is not None else "N/A"
                 print(f"MARKET: ${md['price']:.2f} | Bid: {bid}, Ask: {ask}")
         sim.add_callback(cb)
     
@@ -287,5 +278,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
 
 
