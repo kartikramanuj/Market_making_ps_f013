@@ -1,16 +1,15 @@
 import sys
 from collections import deque
-from decimal import Decimal, getcontext
+from decimal import Decimal, getcontext # Import Decimal
+from ordertree import OrderTree
 from io import StringIO
-
-from ordertree import OrderTree  # your existing dependency
-
+import time
 # Set global decimal precision (important for crypto)
 getcontext().prec = 10
 
 
 class OrderBook:
-    def __init__(self, symbol='BTC/USD', tick_size=Decimal('0.01')):
+    def __init__(self, symbol='BTC/USD', tick_size=Decimal('0.01')): # Use Decimal for tick_size
         self.symbol = symbol
         self.tick_size = tick_size
 
@@ -40,11 +39,17 @@ class OrderBook:
         if not from_data:
             self.next_order_id += 1
             quote['trade_id'] = self.next_order_id
+            # Ensure order_id is also set for the quote if it's a new order
+            if 'order_id' not in quote:
+                quote['order_id'] = self.next_order_id
+
 
         if order_type == 'market':
             trades = self._process_market_order(quote, verbose)
         elif order_type == 'limit':
-            quote['price'] = Decimal(quote['price'])
+            # Ensure price is Decimal when it enters the OrderBook
+            if not isinstance(quote['price'], Decimal):
+                quote['price'] = Decimal(str(quote['price'])) # Convert to string first to avoid float precision issues
             trades, order_in_book = self._process_limit_order(quote, from_data, verbose)
         else:
             sys.exit("order_type must be 'market' or 'limit'")
@@ -73,7 +78,7 @@ class OrderBook:
         trades = []
         quantity_to_trade = quote['quantity']
         side = quote['side']
-        price = quote['price']
+        price = quote['price'] # Price is already Decimal from process_order
 
         if side == 'bid':
             while self.asks and price >= self.asks.min_price() and quantity_to_trade > 0:
@@ -82,7 +87,8 @@ class OrderBook:
                 trades += new_trades
             if quantity_to_trade > 0:
                 if not from_data:
-                    quote['order_id'] = self.next_order_id
+                    # order_id is already set in process_order for new orders
+                    pass 
                 quote['quantity'] = quantity_to_trade
                 self.bids.insert_order(quote)
                 order_in_book = quote
@@ -94,7 +100,8 @@ class OrderBook:
                 trades += new_trades
             if quantity_to_trade > 0:
                 if not from_data:
-                    quote['order_id'] = self.next_order_id
+                    # order_id is already set in process_order for new orders
+                    pass
                 quote['quantity'] = quantity_to_trade
                 self.asks.insert_order(quote)
                 order_in_book = quote
@@ -106,9 +113,12 @@ class OrderBook:
     def _process_order_list(self, side, order_list, quantity_to_trade, quote, verbose):
      trades = []
 
+     # Ensure quantity_to_trade is Decimal for consistent arithmetic
+     quantity_to_trade = Decimal(str(quantity_to_trade))
+
      while len(order_list) > 0 and quantity_to_trade > 0:
         head_order = order_list.get_head_order()
-        traded_price = head_order.price
+        traded_price = head_order.price # This is already Decimal
         counter_party = head_order.trade_id
         new_book_quantity = None
 
@@ -116,11 +126,11 @@ class OrderBook:
             traded_quantity = quantity_to_trade
             new_book_quantity = head_order.quantity - quantity_to_trade
             head_order.update_quantity(new_book_quantity, head_order.timestamp)
-            quantity_to_trade = 0
+            quantity_to_trade = Decimal('0') # Set to Decimal zero
         elif quantity_to_trade == head_order.quantity:
             traded_quantity = quantity_to_trade
             self._remove_order(side, head_order.order_id)
-            quantity_to_trade = 0
+            quantity_to_trade = Decimal('0') # Set to Decimal zero
         else:
             traded_quantity = head_order.quantity
             self._remove_order(side, head_order.order_id)
@@ -131,8 +141,8 @@ class OrderBook:
 
         # This is the trade record that goes to PnL
         trade = {
-            "price": traded_price,
-            "quantity": traded_quantity,
+            "price": traded_price, # Keep as Decimal
+            "quantity": traded_quantity, # Keep as Decimal
             "buy_order_id": head_order.order_id if side == 'ask' else quote['trade_id'],
             "sell_order_id": head_order.order_id if side == 'bid' else quote['trade_id'],
             "our_side": quote["side"]  # Add this so PnLTracker knows your role
@@ -151,8 +161,7 @@ class OrderBook:
 
         self.tape.append(transaction_record)
 
-        return quantity_to_trade, trades
-
+     return float(quantity_to_trade), trades # Return float as expected by simulation
 
     def _remove_order(self, side, order_id):
         if side == 'bid':
@@ -177,6 +186,9 @@ class OrderBook:
         side = update['side']
         update['order_id'] = order_id
         update['timestamp'] = self.time
+        # Ensure price is Decimal for update
+        if 'price' in update and not isinstance(update['price'], Decimal):
+            update['price'] = Decimal(str(update['price']))
         if side == 'bid' and self.bids.order_exists(order_id):
             self.bids.update_order(update)
         elif side == 'ask' and self.asks.order_exists(order_id):
@@ -185,10 +197,10 @@ class OrderBook:
             sys.exit('modify_order() given neither "bid" nor "ask"')
 
     def get_volume_at_price(self, side, price):
-        price = Decimal(price)
+        price = Decimal(str(price)) # Convert to Decimal
         tree = self.bids if side == 'bid' else self.asks
         if tree.price_exists(price):
-            return tree.get_price(price).volume
+            return tree.get_price_list(price).volume # Use get_price_list
         return 0
 
     def get_best_bid(self):
@@ -213,3 +225,5 @@ class OrderBook:
         for trade in list(self.tape)[-10:]:
             buf.write(f"{trade['quantity']} @ {trade['price']} [{trade['timestamp']}] {trade['party1'][0]}/{trade['party2'][0]}\n")
         return buf.getvalue()
+
+
