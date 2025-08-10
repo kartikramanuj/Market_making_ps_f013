@@ -162,7 +162,7 @@ class Simulator:
                     trades, _ = self.book.process_order(order, verbose=False)
                     if trades: 
                         self._notify("trade", {"trades": trades})
-                        self._update_price()
+                    self._update_price()
                     self._notify("order", {"order": order})
                 except Exception as e:
                     pass  # Silently handle order failures
@@ -287,3 +287,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
