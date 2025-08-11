@@ -83,7 +83,7 @@ def test_quote_from_orderbook():
 
 def manual_order_test():
     """Interactive manual testing - FIXED VERSION with proper Decimal handling"""
-    print("=== Manual Order Entry Mode (FIXED) ===")
+    print("=== Manual Order Entry Mode  ===")
     print("This version properly handles Decimal/float type conversions and partial fills!")
     print()
     print("Format: type side price quantity")
@@ -282,7 +282,7 @@ def demo_working_scenario():
 
 
 if __name__ == "__main__":
-    print("Starting FIXED P&L and OrderBook Tests...")
+    print("Starting  P&L and OrderBook Tests...")
     print("="*50)
     
     # Run the automated tests first
@@ -298,7 +298,7 @@ if __name__ == "__main__":
     demo_working_scenario()
     
     # Ask if user wants to do manual testing
-    choice = input("Do you want to run the FIXED manual order test? (yes/no): ").strip().lower()
+    choice = input("Do you want to run the manual order test? (yes/no): ").strip().lower()
     if choice in ['yes', 'y', 'yeah', 'sure']:
         manual_order_test()
     else:
@@ -307,4 +307,5 @@ if __name__ == "__main__":
     print("\nThanks for testing!")
 
     
+
 
